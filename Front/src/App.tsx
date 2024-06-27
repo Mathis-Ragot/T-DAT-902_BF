@@ -1,12 +1,12 @@
 import { useEffect } from "react";
-import Map from "./components/map/Map";
+import NavScreen from "./components/navScreen/NavScreen";
 
 function App() {
   useEffect(() => {}, []);
 
   return (
     <>
-      <Map />
+      <NavScreen />
     </>
   );
 }

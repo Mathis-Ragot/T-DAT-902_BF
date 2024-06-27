@@ -3,17 +3,25 @@ import L from "leaflet";
 import { css } from "glamor";
 import "leaflet/dist/leaflet.css";
 import worldGeoJSON from "../../../utils/geoJSON/geoWorld.json"; // GeoJSON file of the world 50 m resolution
+import departementGeoJSON from "../../../utils/geoJSON/geoFrenchDepartment.json"; // GeoJSON file of the world 50 m resolution
 
 //#region Styles
-const activeCountryStyle = {
+const activeCountryStyle: L.PathOptions = {
   fillColor: "none",
   fillOpacity: 1,
   weight: 0,
 };
-const inactiveCountryStyle = {
+const inactiveCountryStyle: L.PathOptions = {
   fillColor: "gray",
   fillOpacity: 0.7,
   weight: 1,
+};
+
+const activeLimitStyle: L.PathOptions = {
+  weight: 2,
+  opacity: 1,
+  fillColor: "none",
+  fillOpacity: 0.5,
 };
 
 const containerStyle = css({
@@ -33,6 +41,7 @@ const START_ZOOM: number = 6;
 const MAP_CONFIG = {
   center: [47.0, 2.0],
   zoom: START_ZOOM,
+  zoomControl: false,
 };
 const LAYER_CONFIG = {
   maxZoom: MAX_ZOOM,
@@ -42,49 +51,78 @@ const LAYER_CONFIG = {
 
 //#endregion
 
-const Map = () => {
-  const mapRef = useRef(null);
+const Map = (props: any) => {
+  const mapRef = useRef<L.Map | null>(null);
 
   useEffect(() => {
-    const map: L.Map = L.map(mapRef.current, MAP_CONFIG);
+    // Initialize map if it hasn't been initialized yet
+    if (!mapRef.current) {
+      mapRef.current = L.map("map", MAP_CONFIG);
 
-    L.tileLayer(
-      "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      LAYER_CONFIG
-    ).addTo(map);
+      L.tileLayer(
+        "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        LAYER_CONFIG
+      ).addTo(mapRef.current);
 
-    L.geoJSON(
-      worldGeoJSON as GeoJSON.FeatureCollection<GeoJSON.GeometryObject>,
-      {
-        style: (
-          feature: GeoJSON.Feature<GeoJSON.GeometryObject, GeoJSONFeature>
-        ): void => {
-          return feature?.properties?.admin === CURRENT_COUNTRY
-            ? { ...activeCountryStyle }
-            : { ...inactiveCountryStyle };
+      L.geoJSON(
+        worldGeoJSON as GeoJSON.FeatureCollection<GeoJSON.GeometryObject>,
+        {
+          style: (
+            feature: GeoJSON.Feature<GeoJSON.GeometryObject, GeoJSON.Feature>
+          ): L.PathOptions => {
+            return feature?.properties?.admin === CURRENT_COUNTRY
+              ? { ...activeCountryStyle }
+              : { ...inactiveCountryStyle };
+          },
+        }
+      ).addTo(mapRef.current);
+
+      L.geoJSON(departementGeoJSON, {
+        style: (): L.PathOptions => {
+          return { ...activeLimitStyle };
         },
-      }
-    ).addTo(map);
+      }).addTo(mapRef.current);
 
-    onMapEvent(map);
+      onMapEvent();
 
-    return () => {
-      map.off("mousemove");
-      map.off("zoomend");
-      map.remove();
-    };
-  }, []);
+      return () => {
+        // Cleanup function
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
+        }
+      };
+    }
+  }, []); // Empty dependency array ensures this runs only once
 
-  const onMapEvent = (map: L.Map) => {
-    map.on("mousemove", (e: L.LeafletEvent) => {});
+  useEffect(() => {
+    // Handle zoom based on searchLocation changes
+    const { searchLocation } = props;
+    const { coordinates } = searchLocation || {};
 
-    map.on("zoomend", () => {
-      console.log("Zoom level: " + map.getZoom());
+    if (coordinates?.lat && coordinates?.lng && mapRef.current) {
+      const { lat, lng } = coordinates;
+      mapRef.current.setView([lat, lng], 13); // Adjust zoom level as needed
+    }
+  }, [props.searchLocation]);
+
+  const onMapEvent = () => {
+    if (!mapRef.current) {
+      return;
+    }
+    // Event listeners
+    mapRef.current.on("zoomend", () => {
+      console.log("Zoom level: " + mapRef.current?.getZoom());
+      // Additional zoom end handling if required
+    });
+
+    mapRef.current.on("mousemove", (e: L.LeafletEvent) => {
+      // Handle mouse move event if needed
     });
   };
   return (
     <div>
-      <div {...containerStyle} ref={mapRef}></div>
+      <div {...containerStyle} id="map"></div>
     </div>
   );
 };
