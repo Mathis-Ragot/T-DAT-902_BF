@@ -18,8 +18,7 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 // import MailIcon from "@mui/icons-material/Mail";
 import Map from "../map/Map";
 import Fuse from "fuse.js";
-import FrenchCitiesGeoJSON from "../../../utils/geoJSON/geoFrenchCities.json";
-
+import frenchCities from "../../../utils/geoJSON/frenchCities.json";
 import { css } from "glamor";
 import SearchIcon from "@mui/icons-material/Search";
 
@@ -42,6 +41,71 @@ const Main = styled("main", { shouldForwardProp: (prop) => prop !== "open" })<{
     marginLeft: 0,
   }),
 }));
+const styles = {
+  container: css({
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    margin: "20px",
+  }),
+  inputContainer: css({
+    display: "flex",
+    alignItems: "center",
+    border: "2px solid #ccc",
+    borderRadius: "30px",
+    padding: "0 10px",
+  }),
+  input: css({
+    width: "300px",
+    padding: "10px 15px",
+    border: "none",
+    outline: "none",
+    fontSize: "16px",
+    borderRadius: "30px 0 0 30px",
+    transition: "border 0.3s",
+    ":focus": {
+      border: "none",
+    },
+  }),
+  button: css({
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    outline: "none",
+    padding: "0 10px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "background-color 0.3s",
+    borderRadius: "50%",
+    ":hover": {
+      backgroundColor: "#f0f0f0",
+    },
+  }),
+  icon: css({
+    color: "#007BFF",
+    fontSize: "24px",
+  }),
+  resultsContainer: css({
+    position: "absolute",
+    top: "50px", // Ajustez la position verticale selon vos besoins
+    width: "100%",
+    backgroundColor: "#fff",
+    boxShadow: "0px 8px 16px rgba(0, 0, 0, 0.1)",
+    borderRadius: "8px",
+    zIndex: 1,
+  }),
+  resultItem: css({
+    marginLeft: "20px",
+    padding: "10px",
+    borderBottom: "1px solid #ccc",
+    cursor: "pointer",
+    transition: "background-color 0.3s",
+    ":hover": {
+      backgroundColor: "#f0f0f0",
+    },
+  }),
+};
 
 interface AppBarProps extends MuiAppBarProps {
   open?: boolean;
@@ -169,77 +233,11 @@ const NavScreen = () => {
 
 export default NavScreen;
 
-const styles = {
-  container: css({
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    margin: "20px",
-  }),
-  inputContainer: css({
-    display: "flex",
-    alignItems: "center",
-    border: "2px solid #ccc",
-    borderRadius: "30px",
-    padding: "0 10px",
-  }),
-  input: css({
-    width: "300px",
-    padding: "10px 15px",
-    border: "none",
-    outline: "none",
-    fontSize: "16px",
-    borderRadius: "30px 0 0 30px",
-    transition: "border 0.3s",
-    ":focus": {
-      border: "none",
-    },
-  }),
-  button: css({
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    outline: "none",
-    padding: "0 10px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "background-color 0.3s",
-    borderRadius: "50%",
-    ":hover": {
-      backgroundColor: "#f0f0f0",
-    },
-  }),
-  icon: css({
-    color: "#007BFF",
-    fontSize: "24px",
-  }),
-  resultsContainer: css({
-    position: "absolute",
-    top: "50px", // Ajustez la position verticale selon vos besoins
-    width: "100%",
-    backgroundColor: "#fff",
-    boxShadow: "0px 8px 16px rgba(0, 0, 0, 0.1)",
-    borderRadius: "8px",
-    zIndex: 1,
-  }),
-  resultItem: css({
-    marginLeft: "20px",
-    padding: "10px",
-    borderBottom: "1px solid #ccc",
-    cursor: "pointer",
-    transition: "background-color 0.3s",
-    ":hover": {
-      backgroundColor: "#f0f0f0",
-    },
-  }),
-};
-
 const SearchBar = ({ onSearch }) => {
   const [query, setQuery] = useState("");
   const [searchResult, setSearchResult] = useState([]);
 
-  const fuse = new Fuse(FrenchCitiesGeoJSON?.cities, {
+  const fuse = new Fuse(frenchCities?.cities, {
     keys: ["label"],
     threshold: 0.1,
   });

@@ -3,7 +3,8 @@ import L from "leaflet";
 import { css } from "glamor";
 import "leaflet/dist/leaflet.css";
 import worldGeoJSON from "../../../utils/geoJSON/geoWorld.json"; // GeoJSON file of the world 50 m resolution
-import departementGeoJSON from "../../../utils/geoJSON/geoFrenchDepartment.json"; // GeoJSON file of the world 50 m resolution
+import departmentGeoJSON from "../../../utils/geoJSON/geoFrenchDepartment.json";
+import citiesGeoJSON from "../../../utils/geoJSON/geoFrenchCities.json";
 
 //#region Styles
 const activeCountryStyle: L.PathOptions = {
@@ -19,6 +20,14 @@ const inactiveCountryStyle: L.PathOptions = {
 
 const activeLimitStyle: L.PathOptions = {
   weight: 2,
+  opacity: 1,
+  fillColor: "none",
+  fillOpacity: 0.5,
+};
+
+const citiesLimitStyle: L.PathOptions = {
+  color: "red",
+  weight: 1,
   opacity: 1,
   fillColor: "none",
   fillOpacity: 0.5,
@@ -64,7 +73,7 @@ const Map = (props: any) => {
         LAYER_CONFIG
       ).addTo(mapRef.current);
 
-      L.geoJSON(
+      const geoWorld = L.geoJSON(
         worldGeoJSON as GeoJSON.FeatureCollection<GeoJSON.GeometryObject>,
         {
           style: (
@@ -75,15 +84,52 @@ const Map = (props: any) => {
               : { ...inactiveCountryStyle };
           },
         }
-      ).addTo(mapRef.current);
+      );
+      geoWorld.addTo(mapRef.current);
 
-      L.geoJSON(departementGeoJSON, {
+      const geoDepartment = L.geoJSON(departmentGeoJSON, {
         style: (): L.PathOptions => {
           return { ...activeLimitStyle };
         },
-      }).addTo(mapRef.current);
+      });
 
-      onMapEvent();
+      geoDepartment.addTo(mapRef.current);
+
+      const geoCities = L.geoJSON(citiesGeoJSON, {
+        style: (): L.PathOptions => {
+          return { ...citiesLimitStyle };
+        },
+        onEachFeature: (
+          feature: GeoJSON.Feature<GeoJSON.GeometryObject, any>,
+          layer: L.Layer
+        ) => {
+          layer.on({
+            mouseover: (e) => {
+              const layer = e.target;
+              layer.setStyle({
+                // Change le style lorsqu'il y a survol
+                weight: 5,
+                color: "#666",
+                dashArray: "",
+                fillOpacity: 0.7,
+              });
+
+              if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                layer.bringToFront();
+              }
+            },
+            mouseout: (e) => {
+              geoCities.resetStyle(e.target); // Remet le style initial lorsqu'il n'y a plus de survol
+            },
+            click: (e) => {
+              // Vous pouvez ajouter ici votre logique pour gérer le clic sur une entité GeoJSON
+              console.log("Feature clicked:", feature);
+            },
+          });
+        },
+      });
+
+      geoCities.addTo(mapRef.current);
 
       return () => {
         // Cleanup function
@@ -93,6 +139,7 @@ const Map = (props: any) => {
         }
       };
     }
+    onMapEvent();
   }, []); // Empty dependency array ensures this runs only once
 
   useEffect(() => {
