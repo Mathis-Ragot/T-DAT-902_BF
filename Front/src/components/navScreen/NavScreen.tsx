@@ -9,19 +9,30 @@ import IconButton from "@mui/material/IconButton";
 import MenuIcon from "@mui/icons-material/Menu";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import List from "@mui/material/List";
-import ListItem from "@mui/material/ListItem";
-import ListItemButton from "@mui/material/ListItemButton";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
-import InboxIcon from "@mui/icons-material/MoveToInbox";
-import MailIcon from "@mui/icons-material/Mail";
+import {
+  FormControl,
+  FormControlLabel,
+  Radio,
+  RadioGroup,
+} from "@mui/material";
 import Map from "../map/Map";
 import Fuse from "fuse.js";
 import frenchCities from "../../../utils/geoJSON/frenchCities.json";
 import { css } from "glamor";
 import SearchIcon from "@mui/icons-material/Search";
-import { Typography } from "@mui/material";
+import { Typography, Paper, List, ListItem, ListItemText } from "@mui/material";
+
+import {
+  generateImmoData,
+  generateSalaryData,
+  generatePoliticData,
+} from "../../utils/data_generator.js";
+
+import { FILTERS } from "../../utils/constant.js";
+
+const immoData = generateImmoData();
+const salaryData = generateSalaryData();
+const politicData = generatePoliticData();
 
 const drawerWidth = 500;
 // #region styles
@@ -42,6 +53,31 @@ const Main = styled("main", { shouldForwardProp: (prop) => prop !== "open" })<{
     }),
     marginLeft: 0,
   }),
+}));
+
+const AppBar = styled(MuiAppBar, {
+  shouldForwardProp: (prop) => prop !== "open",
+})<AppBarProps>(({ theme, open }) => ({
+  transition: theme.transitions.create(["margin", "width"], {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.leavingScreen,
+  }),
+  ...(open && {
+    width: `calc(100% - ${drawerWidth}px)`,
+    marginLeft: `${drawerWidth}px`,
+    transition: theme.transitions.create(["margin", "width"], {
+      easing: theme.transitions.easing.easeOut,
+      duration: theme.transitions.duration.enteringScreen,
+    }),
+  }),
+}));
+
+const DrawerHeader = styled("div")(({ theme }) => ({
+  display: "flex",
+  alignItems: "center",
+  padding: theme.spacing(0, 1),
+  ...theme.mixins.toolbar,
+  justifyContent: "flex-end",
 }));
 const styles = {
   container: css({
@@ -113,42 +149,21 @@ interface AppBarProps extends MuiAppBarProps {
   open?: boolean;
 }
 
-const AppBar = styled(MuiAppBar, {
-  shouldForwardProp: (prop) => prop !== "open",
-})<AppBarProps>(({ theme, open }) => ({
-  transition: theme.transitions.create(["margin", "width"], {
-    easing: theme.transitions.easing.sharp,
-    duration: theme.transitions.duration.leavingScreen,
-  }),
-  ...(open && {
-    width: `calc(100% - ${drawerWidth}px)`,
-    marginLeft: `${drawerWidth}px`,
-    transition: theme.transitions.create(["margin", "width"], {
-      easing: theme.transitions.easing.easeOut,
-      duration: theme.transitions.duration.enteringScreen,
-    }),
-  }),
-}));
-
-const DrawerHeader = styled("div")(({ theme }) => ({
-  display: "flex",
-  alignItems: "center",
-  padding: theme.spacing(0, 1),
-  ...theme.mixins.toolbar,
-  justifyContent: "flex-end",
-}));
-
 const NavScreen = () => {
+  // #region state
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const [searchLocation, setSearchLocation] = useState<any>(null);
+  const [applyFilter, setApplyFilter] = useState<any>(FILTERS.salary);
   const [deptInfos, setDeptInfos] = useState<any>(null);
   const [cityInfos, setCityInfos] = useState<any>(null);
+  // #endregion
 
-  // useEffect(() => {
-  //   console.log(deptInfos);
-  //   console.log(cityInfos);
-  // }, [deptInfos, cityInfos]);
+  // #region handle
+  const handleApplyFilter = (event: any) => {
+    console.log("applyFilter", event.target.value);
+    setApplyFilter(event.target.value);
+  };
 
   const handleDrawerOpen = () => {
     setOpen(true);
@@ -190,7 +205,70 @@ const NavScreen = () => {
       (city: any) => city.insee_code === infos.properties.code
     );
 
-    if (city[0]) setCityInfos(city[0]);
+    console.log("politicData", politicData);
+    console.log("immoData", immoData);
+    console.log("salaryData", salaryData);
+
+    if (city[0]) {
+      const politicResult = politicData.find(
+        (item) => item.commune_code === city[0].insee_code
+      );
+      const immoResult = immoData.filter(
+        (item) => item.commune_code === city[0].insee_code
+      );
+      const salaryResult = salaryData.find(
+        (item) => item.commune_code === city[0].insee_code
+      );
+
+      console.log("politicResult", politicResult);
+      console.log("immoResult", immoResult);
+      console.log("salaryResult", salaryResult);
+
+      const data = {
+        city: city[0],
+        politicData: politicResult,
+        immoResult: immoResult,
+        salaryResult: salaryResult,
+      };
+
+      console.log(data);
+      setCityInfos(data);
+    }
+  };
+  // #endregion
+
+  // #region render
+  const renderMapFilter = () => {
+    return (
+      <Box sx={{ marginTop: 3, marginLeft: 2 }}>
+        <Typography
+          sx={{ textDecoration: "underline" }}
+          variant="h6"
+          gutterBottom
+        >
+          Afficher sur la carte
+        </Typography>
+        <FormControl component="fieldset">
+          <RadioGroup value={applyFilter} onChange={handleApplyFilter}>
+            <FormControlLabel
+              value={FILTERS.immo}
+              control={<Radio />}
+              label="Prix de l'immobilier "
+            />
+            <FormControlLabel
+              value={FILTERS.salary}
+              control={<Radio />}
+              label="Niveau de vie (salaire en €)"
+            />
+            <FormControlLabel
+              value={FILTERS.politic}
+              control={<Radio />}
+              label="Orientation politique"
+            />
+          </RadioGroup>
+        </FormControl>
+      </Box>
+    );
   };
 
   const renderDepartement = () => {
@@ -203,13 +281,13 @@ const NavScreen = () => {
           variant="h6"
           gutterBottom
         >
-          Informations de le département :
+          Informations du département
         </Typography>
 
         {deptInfos ? (
           <>
             <Typography>
-              <strong>Departement :</strong> {name}
+              <strong>Département :</strong> {name}
             </Typography>
             <Typography>
               <strong>Code départemental :</strong> {code}
@@ -226,7 +304,9 @@ const NavScreen = () => {
   };
 
   const renderCity = () => {
-    const { zip_code, label, region_name } = cityInfos || {};
+    const { city } = cityInfos || {};
+    const { zip_code, label, region_name } = city || {};
+
     return (
       <Box sx={{ marginTop: 3, marginLeft: 2 }}>
         <Typography
@@ -234,13 +314,14 @@ const NavScreen = () => {
           variant="h6"
           gutterBottom
         >
-          Informations de la ville :
+          Informations de la ville
         </Typography>
 
         {cityInfos ? (
           <>
             <Typography>
-              <strong>Ville :</strong> {label}
+              <strong>Ville :</strong>{" "}
+              {label.charAt(0).toUpperCase() + label.slice(1)}
             </Typography>
             <Typography>
               <strong>Code postal :</strong> {zip_code}
@@ -248,6 +329,8 @@ const NavScreen = () => {
             <Typography>
               <strong>Région :</strong> {region_name}
             </Typography>
+
+            {renderCityInformations()}
           </>
         ) : (
           <Typography>Aucune commune sélectionée</Typography>
@@ -255,6 +338,60 @@ const NavScreen = () => {
       </Box>
     );
   };
+
+  const renderCityInformations = () => {
+    const { politicData, immoResult, salaryResult } = cityInfos || {};
+    return (
+      <Box sx={{ marginTop: 3, marginRight: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Prix de l'immobilier
+        </Typography>
+        <Paper elevation={3} style={{ padding: "16px", marginBottom: "16px" }}>
+          <List>
+            {immoResult &&
+              immoResult.map((property, index) => (
+                <ListItem key={index}>
+                  <ListItemText
+                    primary={`${property.property_type_code}`}
+                    secondary={`Prix m² : ${property.m2_price}€`}
+                  />
+                </ListItem>
+              ))}
+          </List>
+        </Paper>
+
+        <Typography variant="h6" gutterBottom>
+          Niveau de vie
+        </Typography>
+        <Paper elevation={3} style={{ padding: "16px", marginBottom: "16px" }}>
+          <ListItem>
+            <ListItemText
+              primary="Niveau de vie mensuel moyen"
+              secondary={`Salaire moyen : ${salaryResult.median_monthly_stdr_living}€`}
+            />
+          </ListItem>
+        </Paper>
+
+        <Typography variant="h6" gutterBottom>
+          Orientation politique
+        </Typography>
+        <Paper elevation={3} style={{ padding: "16px", marginBottom: "16px" }}>
+          <List>
+            {politicData &&
+              politicData.candidate_results.map((result, index) => (
+                <ListItem key={index}>
+                  <ListItemText
+                    primary={`${result.candidate_firstname} ${result.candidate_lastname} (${result.political_parti_name})`}
+                    secondary={`Pourcentage : ${result.percentage_expressed}%`}
+                  />
+                </ListItem>
+              ))}
+          </List>
+        </Paper>
+      </Box>
+    );
+  };
+  // #endregion
 
   return (
     <Box
@@ -304,9 +441,8 @@ const NavScreen = () => {
         </DrawerHeader>
         <Divider />
         <List>
-          {/* Departeme */}
+          {renderMapFilter()}
           {renderDepartement()}
-          {/* City */}
           {renderCity()}
         </List>
         <Divider />
@@ -325,6 +461,10 @@ const NavScreen = () => {
             handleSetDeptInfos={handleSetDeptInfos}
             handleSetCityInfos={handleSetCityInfos}
             searchLocation={searchLocation}
+            applyFilter={applyFilter}
+            immoData={immoData}
+            salaryData={salaryData}
+            politicData={politicData}
           />
         </div>
       </Main>

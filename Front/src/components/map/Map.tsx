@@ -6,6 +6,12 @@ import worldGeoJSON from "../../../utils/geoJSON/geoWorld.json"; // GeoJSON file
 import departmentGeoJSON from "../../../utils/geoJSON/geoFrenchDepartment.json";
 import citiesGeoJSON from "../../../utils/geoJSON/geoFrenchCities.json";
 import frenchCities from "../../../utils/geoJSON/frenchCities.json";
+import {
+  FILTERS,
+  getImmoColor,
+  getSalaryColor,
+  getPoliticalColor,
+} from "../../utils/constant.js";
 
 //#region Styles
 const activeCountryStyle: L.PathOptions = {
@@ -47,9 +53,15 @@ const citiesLimitStyle: L.PathOptions = {
 };
 
 const citiesFillStyle: L.PathOptions = {
-  weight: 5,
+  weight: 2,
   color: "red",
-  fillOpacity: 0,
+  fillOpacity: 0.3,
+};
+
+const citiesFilterFillStyle: L.PathOptions = {
+  weight: 2,
+  fillOpacity: 0.5,
+  color: "#3388ff",
 };
 
 const containerStyle = css({
@@ -84,6 +96,7 @@ const filterCommunesByDepartment = (departmentId: any) => {
     .filter((city: any) => city.department_number === departmentId)
     .map((city: any) => city.insee_code);
 
+  console.log(zipCodes);
   return {
     type: "FeatureCollection",
     features: citiesGeoJSON.features.filter((feature: any) => {
@@ -94,7 +107,11 @@ const filterCommunesByDepartment = (departmentId: any) => {
 
 const Map = (props: any) => {
   const mapRef = useRef<L.Map | null>(null);
-  const { handleSetDeptInfos, handleSetCityInfos } = props;
+  const {
+    handleSetDeptInfos,
+    handleSetCityInfos,
+    applyFilter = FILTERS.immo,
+  } = props;
   useEffect(() => {
     if (!mapRef.current) {
       mapRef.current = L.map("map", MAP_CONFIG);
@@ -118,6 +135,8 @@ const Map = (props: any) => {
     onMapEvent();
   }, []);
 
+  useEffect(() => {}, [applyFilter]);
+
   useEffect(() => {
     // Handle zoom based on searchLocation changes
     const { searchLocation } = props;
@@ -128,6 +147,66 @@ const Map = (props: any) => {
       mapRef.current.setView([lat, lng], 13); // Adjust zoom level as needed
     }
   }, [props.searchLocation]);
+
+  const getFilterStyle = (feature: any) => {
+    console.log("feature", feature);
+
+    const { immoData, salaryData, politicData } = props;
+
+    if (!immoData || !salaryData || !politicData) return citiesFillStyle;
+
+    // #region Salary
+    const currentSalary = salaryData.find(
+      (item: any) => item.commune_code == feature.properties.code
+    );
+    console.log(
+      "currentSalary",
+      currentSalary,
+      "getColor on ",
+      currentSalary.median_monthly_stdr_living
+    );
+    // #endregion
+
+    // #region politic
+    const politic = politicData.find(
+      (item: any) => item.commune_code == feature.properties.code
+    );
+    console.log(politic);
+    const highestPoliticPercentage = politic.candidate_results.reduce(
+      (max, obj) =>
+        parseFloat(obj.percentage_expressed) >
+        parseFloat(max.percentage_expressed)
+          ? obj
+          : max
+    );
+    console.log(
+      "highestPoliticPercentage",
+      highestPoliticPercentage,
+      "getDColor on",
+      highestPoliticPercentage.political_parti_name
+    );
+
+    // #endregion
+
+    switch (applyFilter) {
+      case FILTERS.immo:
+        return citiesFillStyle;
+      case FILTERS.salary:
+        return {
+          ...citiesFilterFillStyle,
+          fillColor: getSalaryColor(currentSalary.median_monthly_stdr_living),
+        };
+      case FILTERS.political:
+        return {
+          ...citiesFilterFillStyle,
+          fillColor: getPoliticalColor(
+            highestPoliticPercentage.political_parti_name
+          ),
+        };
+      default:
+        return citiesFillStyle;
+    }
+  };
 
   const geoWorldDef = () => {
     const geoWorld = L.geoJSON(
@@ -143,64 +222,6 @@ const Map = (props: any) => {
       }
     );
     geoWorld.addTo(mapRef.current);
-  };
-
-  let communesLayer: any;
-  let cityClicked = null;
-
-  const addCommunesToMap = (communesGeoJSON) => {
-    if (communesLayer) {
-      mapRef.current.removeLayer(communesLayer);
-    }
-
-    const resetCommunesLayer = () => {
-      communesLayer.eachLayer((layer) => {
-        communesLayer.resetStyle(layer);
-      });
-    };
-
-    communesLayer = L.geoJSON(communesGeoJSON, {
-      style: citiesLimitStyle,
-      onEachFeature: (feature, layer) => {
-        layer.on({
-          mouseover: (e) => {
-            const layer = e.target;
-            if (!cityClicked) {
-              layer.setStyle(citiesFillStyle);
-            }
-            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
-              layer.bringToFront();
-            }
-          },
-          mouseout: (e) => {
-            const layer = e.target;
-            if (!cityClicked) {
-              communesLayer.resetStyle(layer);
-            }
-          },
-          click: (e) => {
-            const layer = e.target;
-            if (!cityClicked) {
-              cityClicked = feature;
-              handleSetCityInfos(feature);
-            } else {
-              if (feature.properties.code != cityClicked?.properties.code) {
-                handleSetCityInfos(feature);
-                cityClicked = feature;
-                resetCommunesLayer();
-                layer.setStyle(citiesFillStyle);
-              } else {
-                cityClicked = null;
-                handleSetCityInfos(null);
-                resetCommunesLayer();
-              }
-            }
-          },
-        });
-      },
-    });
-
-    communesLayer.addTo(mapRef.current);
   };
 
   const geoDepartmentDef = () => {
@@ -235,7 +256,7 @@ const Map = (props: any) => {
             cityClicked = null;
 
             const communesGeoJSON = filterCommunesByDepartment(departementId);
-            addCommunesToMap(communesGeoJSON);
+            geoCommunesDef(communesGeoJSON);
 
             if (mapRef.current?.getZoom() < 10)
               mapRef.current.fitBounds(layer.getBounds());
@@ -244,6 +265,66 @@ const Map = (props: any) => {
       },
     });
     geoDepartment.addTo(mapRef.current);
+  };
+
+  let communesLayer: any;
+  let cityClicked: any = null;
+  const geoCommunesDef = (communesGeoJSON) => {
+    if (communesLayer) {
+      mapRef.current.removeLayer(communesLayer);
+    }
+
+    const resetCommunesLayer = () => {
+      communesLayer.eachLayer((layer) => {
+        communesLayer.resetStyle(layer);
+      });
+    };
+
+    communesLayer = L.geoJSON(communesGeoJSON, {
+      style: (feature) => {
+        return getFilterStyle(feature);
+      },
+      onEachFeature: (feature, layer) => {
+        layer.on({
+          mouseover: (e) => {
+            const layer = e.target;
+            if (!cityClicked) {
+              layer.setStyle(citiesFillStyle);
+            }
+            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+              layer.bringToFront();
+            }
+          },
+          mouseout: (e) => {
+            const layer = e.target;
+            if (!cityClicked) {
+              communesLayer.resetStyle(layer);
+            }
+          },
+          click: (e) => {
+            const layer = e.target;
+            getFilterStyle(feature);
+            if (!cityClicked) {
+              cityClicked = feature;
+              handleSetCityInfos(feature);
+            } else {
+              if (feature.properties.code != cityClicked?.properties.code) {
+                handleSetCityInfos(feature);
+                cityClicked = feature;
+                resetCommunesLayer();
+                layer.setStyle(citiesFillStyle);
+              } else {
+                cityClicked = null;
+                handleSetCityInfos(null);
+                resetCommunesLayer();
+              }
+            }
+          },
+        });
+      },
+    });
+
+    communesLayer.addTo(mapRef.current);
   };
 
   const onMapEvent = () => {
@@ -257,6 +338,7 @@ const Map = (props: any) => {
 
     mapRef.current.on("mousemove", (e: L.LeafletEvent) => {});
   };
+
   return (
     <div>
       <div {...containerStyle} id="map"></div>
