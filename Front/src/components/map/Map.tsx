@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import worldGeoJSON from "../../../utils/geoJSON/geoWorld.json"; // GeoJSON file of the world 50 m resolution
 import departmentGeoJSON from "../../../utils/geoJSON/geoFrenchDepartment.json";
 import citiesGeoJSON from "../../../utils/geoJSON/geoFrenchCities.json";
+import frenchCities from "../../../utils/geoJSON/frenchCities.json";
 
 //#region Styles
 const activeCountryStyle: L.PathOptions = {
@@ -25,12 +26,30 @@ const activeLimitStyle: L.PathOptions = {
   fillOpacity: 0.5,
 };
 
-const citiesLimitStyle: L.PathOptions = {
-  color: "red",
-  weight: 1,
-  opacity: 1,
-  fillColor: "none",
+const departmentLimitStyle: L.PathOptions = {
+  weight: 2,
+  color: "#3388ff",
   fillOpacity: 0.5,
+  fillColor: "transparent",
+};
+
+const departmentFillStyle: L.PathOptions = {
+  weight: 5,
+  color: "#666",
+  dashArray: "",
+  fillOpacity: 0.7,
+};
+
+const citiesLimitStyle: L.PathOptions = {
+  color: "#3388ff",
+  weight: 2,
+  fillOpacity: 0.5,
+};
+
+const citiesFillStyle: L.PathOptions = {
+  weight: 5,
+  color: "red",
+  fillOpacity: 0,
 };
 
 const containerStyle = css({
@@ -60,11 +79,26 @@ const LAYER_CONFIG = {
 
 //#endregion
 
+const filterCommunesByDepartment = (
+  communesGeoJSON: any,
+  departmentId: any
+) => {
+  const zipCodes = frenchCities?.cities
+    .filter((city: any) => city.department_number === departmentId)
+    .map((city: any) => city.insee_code);
+
+  return {
+    type: "FeatureCollection",
+    features: communesGeoJSON.features.filter((feature: any) => {
+      if (zipCodes.includes(feature.properties.code)) return feature;
+    }),
+  };
+};
+
 const Map = (props: any) => {
   const mapRef = useRef<L.Map | null>(null);
 
   useEffect(() => {
-    // Initialize map if it hasn't been initialized yet
     if (!mapRef.current) {
       mapRef.current = L.map("map", MAP_CONFIG);
 
@@ -73,63 +107,8 @@ const Map = (props: any) => {
         LAYER_CONFIG
       ).addTo(mapRef.current);
 
-      const geoWorld = L.geoJSON(
-        worldGeoJSON as GeoJSON.FeatureCollection<GeoJSON.GeometryObject>,
-        {
-          style: (
-            feature: GeoJSON.Feature<GeoJSON.GeometryObject, GeoJSON.Feature>
-          ): L.PathOptions => {
-            return feature?.properties?.admin === CURRENT_COUNTRY
-              ? { ...activeCountryStyle }
-              : { ...inactiveCountryStyle };
-          },
-        }
-      );
-      geoWorld.addTo(mapRef.current);
-
-      const geoDepartment = L.geoJSON(departmentGeoJSON, {
-        style: (): L.PathOptions => {
-          return { ...activeLimitStyle };
-        },
-      });
-
-      geoDepartment.addTo(mapRef.current);
-
-      const geoCities = L.geoJSON(citiesGeoJSON, {
-        style: (): L.PathOptions => {
-          return { ...citiesLimitStyle };
-        },
-        onEachFeature: (
-          feature: GeoJSON.Feature<GeoJSON.GeometryObject, any>,
-          layer: L.Layer
-        ) => {
-          layer.on({
-            mouseover: (e) => {
-              const layer = e.target;
-              layer.setStyle({
-                // Change le style lorsqu'il y a survol
-                weight: 5,
-                color: "#666",
-                dashArray: "",
-                fillOpacity: 0.7,
-              });
-
-              if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
-                layer.bringToFront();
-              }
-            },
-            mouseout: (e) => {
-              geoCities.resetStyle(e.target); // Remet le style initial lorsqu'il n'y a plus de survol
-            },
-            click: (e) => {
-              // Vous pouvez ajouter ici votre logique pour gérer le clic sur une entité GeoJSON
-              console.log("Feature clicked:", feature);
-            },
-          });
-        },
-      });
-
-      geoCities.addTo(mapRef.current);
+      geoWorldDef();
+      geoDepartmentDef();
 
       return () => {
         // Cleanup function
@@ -140,7 +119,7 @@ const Map = (props: any) => {
       };
     }
     onMapEvent();
-  }, []); // Empty dependency array ensures this runs only once
+  }, []);
 
   useEffect(() => {
     // Handle zoom based on searchLocation changes
@@ -153,6 +132,96 @@ const Map = (props: any) => {
     }
   }, [props.searchLocation]);
 
+  const geoWorldDef = () => {
+    const geoWorld = L.geoJSON(
+      worldGeoJSON as GeoJSON.FeatureCollection<GeoJSON.GeometryObject>,
+      {
+        style: (
+          feature: GeoJSON.Feature<GeoJSON.GeometryObject, GeoJSON.Feature>
+        ): L.PathOptions => {
+          return feature?.properties?.admin === CURRENT_COUNTRY
+            ? { ...activeCountryStyle }
+            : { ...inactiveCountryStyle };
+        },
+      }
+    );
+    geoWorld.addTo(mapRef.current);
+  };
+
+  const geoDepartmentDef = () => {
+    const geoDepartment = L.geoJSON(departmentGeoJSON, {
+      style: (): L.PathOptions => {
+        return {
+          ...activeLimitStyle,
+          ...departmentLimitStyle,
+        };
+      },
+      onEachFeature: (
+        feature: GeoJSON.Feature<GeoJSON.GeometryObject, any>,
+        layer: L.Layer
+      ) => {
+        layer.on({
+          mouseover: (e) => {
+            const layer = e.target;
+            layer.setStyle(departmentFillStyle);
+
+            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+              layer.bringToFront();
+            }
+          },
+          mouseout: (e) => {
+            geoDepartment.resetStyle(e.target);
+          },
+          click: (e) => {
+            const layer = e.target;
+            const departementId = feature.properties.code;
+            const communesGeoJSON = filterCommunesByDepartment(
+              citiesGeoJSON,
+              departementId
+            );
+
+            addCommunesToMap(communesGeoJSON);
+
+            if (mapRef.current?.getZoom() < 10)
+              mapRef.current.fitBounds(layer.getBounds());
+          },
+        });
+      },
+    });
+    geoDepartment.addTo(mapRef.current);
+  };
+
+  let communesLayer: any;
+  const addCommunesToMap = (communesGeoJSON) => {
+    if (communesLayer) {
+      mapRef.current.removeLayer(communesLayer);
+    }
+
+    communesLayer = L.geoJSON(communesGeoJSON, {
+      style: citiesLimitStyle,
+      onEachFeature: (feature, layer) => {
+        layer.on({
+          mouseover: (e) => {
+            const layer = e.target;
+            layer.setStyle(citiesFillStyle);
+
+            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+              layer.bringToFront();
+            }
+          },
+          mouseout: (e) => {
+            communesLayer.resetStyle(e.target);
+          },
+          click: (e) => {
+            const layer = e.target;
+            mapRef.current.fitBounds(layer.getBounds());
+          },
+        });
+      },
+    });
+    communesLayer.addTo(mapRef.current);
+  };
+
   const onMapEvent = () => {
     if (!mapRef.current) {
       return;
@@ -160,12 +229,9 @@ const Map = (props: any) => {
     // Event listeners
     mapRef.current.on("zoomend", () => {
       console.log("Zoom level: " + mapRef.current?.getZoom());
-      // Additional zoom end handling if required
     });
 
-    mapRef.current.on("mousemove", (e: L.LeafletEvent) => {
-      // Handle mouse move event if needed
-    });
+    mapRef.current.on("mousemove", (e: L.LeafletEvent) => {});
   };
   return (
     <div>
