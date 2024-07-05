@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { styled, useTheme } from "@mui/material/styles";
 import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
@@ -9,20 +9,22 @@ import IconButton from "@mui/material/IconButton";
 import MenuIcon from "@mui/icons-material/Menu";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-// import List from "@mui/material/List";
-// import ListItem from "@mui/material/ListItem";
-// import ListItemButton from "@mui/material/ListItemButton";
-// import ListItemIcon from "@mui/material/ListItemIcon";
-// import ListItemText from "@mui/material/ListItemText";
-// import InboxIcon from "@mui/icons-material/MoveToInbox";
-// import MailIcon from "@mui/icons-material/Mail";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import ListItemButton from "@mui/material/ListItemButton";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
+import InboxIcon from "@mui/icons-material/MoveToInbox";
+import MailIcon from "@mui/icons-material/Mail";
 import Map from "../map/Map";
 import Fuse from "fuse.js";
 import frenchCities from "../../../utils/geoJSON/frenchCities.json";
 import { css } from "glamor";
 import SearchIcon from "@mui/icons-material/Search";
+import { Typography } from "@mui/material";
 
 const drawerWidth = 500;
+// #region styles
 const Main = styled("main", { shouldForwardProp: (prop) => prop !== "open" })<{
   open?: boolean;
 }>(({ theme, open }) => ({
@@ -106,7 +108,7 @@ const styles = {
     },
   }),
 };
-
+//#endregion
 interface AppBarProps extends MuiAppBarProps {
   open?: boolean;
 }
@@ -140,6 +142,13 @@ const NavScreen = () => {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const [searchLocation, setSearchLocation] = useState<any>(null);
+  const [deptInfos, setDeptInfos] = useState<any>(null);
+  const [cityInfos, setCityInfos] = useState<any>(null);
+
+  // useEffect(() => {
+  //   console.log(deptInfos);
+  //   console.log(cityInfos);
+  // }, [deptInfos, cityInfos]);
 
   const handleDrawerOpen = () => {
     setOpen(true);
@@ -151,6 +160,100 @@ const NavScreen = () => {
 
   const handleSearch = (query: string) => {
     if (query) setSearchLocation(query);
+  };
+
+  const handleSetDeptInfos = (infos: any) => {
+    if (!infos) {
+      setDeptInfos(null);
+      return;
+    }
+    const { properties } = infos;
+    const dept = frenchCities?.cities.filter(
+      (city: any) => city.department_number === properties.code
+    );
+
+    const data = {
+      code: properties.code,
+      name: properties.nom,
+      nb_cities: dept.length,
+    };
+    setDeptInfos(data);
+  };
+
+  const handleSetCityInfos = (infos: any) => {
+    if (!infos) {
+      setCityInfos(null);
+      return;
+    }
+
+    const city = frenchCities?.cities.filter(
+      (city: any) => city.insee_code === infos.properties.code
+    );
+
+    if (city[0]) setCityInfos(city[0]);
+  };
+
+  const renderDepartement = () => {
+    const { code, name, nb_cities } = deptInfos || {};
+
+    return (
+      <Box sx={{ marginLeft: 2 }}>
+        <Typography
+          sx={{ textDecoration: "underline" }}
+          variant="h6"
+          gutterBottom
+        >
+          Informations de le département :
+        </Typography>
+
+        {deptInfos ? (
+          <>
+            <Typography>
+              <strong>Departement :</strong> {name}
+            </Typography>
+            <Typography>
+              <strong>Code départemental :</strong> {code}
+            </Typography>
+            <Typography>
+              <strong>Nombre de ville :</strong> {nb_cities}
+            </Typography>
+          </>
+        ) : (
+          <Typography>Aucune département sélectionée</Typography>
+        )}
+      </Box>
+    );
+  };
+
+  const renderCity = () => {
+    const { zip_code, label, region_name } = cityInfos || {};
+    return (
+      <Box sx={{ marginTop: 3, marginLeft: 2 }}>
+        <Typography
+          sx={{ textDecoration: "underline" }}
+          variant="h6"
+          gutterBottom
+        >
+          Informations de la ville :
+        </Typography>
+
+        {cityInfos ? (
+          <>
+            <Typography>
+              <strong>Ville :</strong> {label}
+            </Typography>
+            <Typography>
+              <strong>Code postal :</strong> {zip_code}
+            </Typography>
+            <Typography>
+              <strong>Région :</strong> {region_name}
+            </Typography>
+          </>
+        ) : (
+          <Typography>Aucune commune sélectionée</Typography>
+        )}
+      </Box>
+    );
   };
 
   return (
@@ -200,18 +303,12 @@ const NavScreen = () => {
           </IconButton>
         </DrawerHeader>
         <Divider />
-        {/* <List>
-          {["Inbox", "Starred", "Send email", "Drafts"].map((text, index) => (
-            <ListItem key={text} disablePadding>
-              <ListItemButton>
-                <ListItemIcon>
-                  {index % 2 === 0 ? <InboxIcon /> : <MailIcon />}
-                </ListItemIcon>
-                <ListItemText primary={text} />
-              </ListItemButton>
-            </ListItem>
-          ))}
-        </List> */}
+        <List>
+          {/* Departeme */}
+          {renderDepartement()}
+          {/* City */}
+          {renderCity()}
+        </List>
         <Divider />
       </Drawer>
       <Main open={open} sx={{ width: "100%", flexGrow: 1 }}>
@@ -224,7 +321,11 @@ const NavScreen = () => {
             left: 0,
           }}
         >
-          <Map searchLocation={searchLocation} />
+          <Map
+            handleSetDeptInfos={handleSetDeptInfos}
+            handleSetCityInfos={handleSetCityInfos}
+            searchLocation={searchLocation}
+          />
         </div>
       </Main>
     </Box>

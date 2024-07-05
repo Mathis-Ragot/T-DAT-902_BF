@@ -79,17 +79,14 @@ const LAYER_CONFIG = {
 
 //#endregion
 
-const filterCommunesByDepartment = (
-  communesGeoJSON: any,
-  departmentId: any
-) => {
+const filterCommunesByDepartment = (departmentId: any) => {
   const zipCodes = frenchCities?.cities
     .filter((city: any) => city.department_number === departmentId)
     .map((city: any) => city.insee_code);
 
   return {
     type: "FeatureCollection",
-    features: communesGeoJSON.features.filter((feature: any) => {
+    features: citiesGeoJSON.features.filter((feature: any) => {
       if (zipCodes.includes(feature.properties.code)) return feature;
     }),
   };
@@ -97,7 +94,7 @@ const filterCommunesByDepartment = (
 
 const Map = (props: any) => {
   const mapRef = useRef<L.Map | null>(null);
-
+  const { handleSetDeptInfos, handleSetCityInfos } = props;
   useEffect(() => {
     if (!mapRef.current) {
       mapRef.current = L.map("map", MAP_CONFIG);
@@ -148,6 +145,64 @@ const Map = (props: any) => {
     geoWorld.addTo(mapRef.current);
   };
 
+  let communesLayer: any;
+  let cityClicked = null;
+
+  const addCommunesToMap = (communesGeoJSON) => {
+    if (communesLayer) {
+      mapRef.current.removeLayer(communesLayer);
+    }
+
+    const resetCommunesLayer = () => {
+      communesLayer.eachLayer((layer) => {
+        communesLayer.resetStyle(layer);
+      });
+    };
+
+    communesLayer = L.geoJSON(communesGeoJSON, {
+      style: citiesLimitStyle,
+      onEachFeature: (feature, layer) => {
+        layer.on({
+          mouseover: (e) => {
+            const layer = e.target;
+            if (!cityClicked) {
+              layer.setStyle(citiesFillStyle);
+            }
+            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+              layer.bringToFront();
+            }
+          },
+          mouseout: (e) => {
+            const layer = e.target;
+            if (!cityClicked) {
+              communesLayer.resetStyle(layer);
+            }
+          },
+          click: (e) => {
+            const layer = e.target;
+            if (!cityClicked) {
+              cityClicked = feature;
+              handleSetCityInfos(feature);
+            } else {
+              if (feature.properties.code != cityClicked?.properties.code) {
+                handleSetCityInfos(feature);
+                cityClicked = feature;
+                resetCommunesLayer();
+                layer.setStyle(citiesFillStyle);
+              } else {
+                cityClicked = null;
+                handleSetCityInfos(null);
+                resetCommunesLayer();
+              }
+            }
+          },
+        });
+      },
+    });
+
+    communesLayer.addTo(mapRef.current);
+  };
+
   const geoDepartmentDef = () => {
     const geoDepartment = L.geoJSON(departmentGeoJSON, {
       style: (): L.PathOptions => {
@@ -175,11 +230,11 @@ const Map = (props: any) => {
           click: (e) => {
             const layer = e.target;
             const departementId = feature.properties.code;
-            const communesGeoJSON = filterCommunesByDepartment(
-              citiesGeoJSON,
-              departementId
-            );
+            handleSetDeptInfos(feature);
+            handleSetCityInfos(null);
+            cityClicked = null;
 
+            const communesGeoJSON = filterCommunesByDepartment(departementId);
             addCommunesToMap(communesGeoJSON);
 
             if (mapRef.current?.getZoom() < 10)
@@ -189,37 +244,6 @@ const Map = (props: any) => {
       },
     });
     geoDepartment.addTo(mapRef.current);
-  };
-
-  let communesLayer: any;
-  const addCommunesToMap = (communesGeoJSON) => {
-    if (communesLayer) {
-      mapRef.current.removeLayer(communesLayer);
-    }
-
-    communesLayer = L.geoJSON(communesGeoJSON, {
-      style: citiesLimitStyle,
-      onEachFeature: (feature, layer) => {
-        layer.on({
-          mouseover: (e) => {
-            const layer = e.target;
-            layer.setStyle(citiesFillStyle);
-
-            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
-              layer.bringToFront();
-            }
-          },
-          mouseout: (e) => {
-            communesLayer.resetStyle(e.target);
-          },
-          click: (e) => {
-            const layer = e.target;
-            mapRef.current.fitBounds(layer.getBounds());
-          },
-        });
-      },
-    });
-    communesLayer.addTo(mapRef.current);
   };
 
   const onMapEvent = () => {
