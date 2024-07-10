@@ -36,5 +36,5 @@ import {
     );
   };
   
-  export const useDrink = () => useContext(PropertyPriceContext);
+  export const usePropertyPrice = () => useContext(PropertyPriceContext);
   

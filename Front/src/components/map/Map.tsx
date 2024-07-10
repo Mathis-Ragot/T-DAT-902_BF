@@ -13,6 +13,8 @@ import {
   getPoliticalColor,
 } from "../../utils/constant.js";
 
+import { useLifeLevel } from "../context/LifeLevelContext.tsx";
+
 //#region Styles
 const activeCountryStyle: L.PathOptions = {
   fillColor: "none",
@@ -106,6 +108,7 @@ const filterCommunesByDepartment = (departmentId: any) => {
 };
 
 const Map = (props: any) => {
+  const { lifeLevel, getDataLifeLevel } = useLifeLevel()
   const mapRef = useRef<L.Map | null>(null);
   const {
     handleSetDeptInfos,
@@ -149,7 +152,7 @@ const Map = (props: any) => {
   }, [props.searchLocation]);
 
   const getFilterStyle = (feature: any) => {
-    console.log("feature", feature);
+    //console.log("feature", feature);
 
     const { immoData, salaryData, politicData } = props;
 
@@ -159,19 +162,19 @@ const Map = (props: any) => {
     const currentSalary = salaryData.find(
       (item: any) => item.commune_code == feature.properties.code
     );
-    console.log(
-      "currentSalary",
-      currentSalary,
-      "getColor on ",
-      currentSalary.median_monthly_stdr_living
-    );
+    // console.log(
+    //   "currentSalary",
+    //   currentSalary,
+    //   "getColor on ",
+    //   currentSalary.median_monthly_stdr_living
+    // );
     // #endregion
 
     // #region politic
     const politic = politicData.find(
       (item: any) => item.commune_code == feature.properties.code
     );
-    console.log(politic);
+    //console.log(politic);
     const highestPoliticPercentage = politic.candidate_results.reduce(
       (max, obj) =>
         parseFloat(obj.percentage_expressed) >
@@ -179,12 +182,12 @@ const Map = (props: any) => {
           ? obj
           : max
     );
-    console.log(
-      "highestPoliticPercentage",
-      highestPoliticPercentage,
-      "getDColor on",
-      highestPoliticPercentage.political_parti_name
-    );
+    // console.log(
+    //   "highestPoliticPercentage",
+    //   highestPoliticPercentage,
+    //   "getDColor on",
+    //   highestPoliticPercentage.political_parti_name
+    //);
 
     // #endregion
 
@@ -254,6 +257,7 @@ const Map = (props: any) => {
             handleSetDeptInfos(feature);
             handleSetCityInfos(null);
             cityClicked = null;
+            getDataLifeLevel(departementId);
 
             const communesGeoJSON = filterCommunesByDepartment(departementId);
             geoCommunesDef(communesGeoJSON);
@@ -333,7 +337,7 @@ const Map = (props: any) => {
     }
     // Event listeners
     mapRef.current.on("zoomend", () => {
-      console.log("Zoom level: " + mapRef.current?.getZoom());
+      //console.log("Zoom level: " + mapRef.current?.getZoom());
     });
 
     mapRef.current.on("mousemove", (e: L.LeafletEvent) => {});

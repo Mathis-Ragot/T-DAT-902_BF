@@ -15,7 +15,7 @@ import {
     const [legislative, setlegislative] = useState([]);
 
     const getDataLegislative = useCallback(async (departmental_code: String) => {
-        await axios.get(env.LEGISLATIVE_URL, { params: { departmental_code: departmental_code}})
+        await axios.get('http://localhost:8080/read-life-level', { params: { departmental_code: departmental_code}})
             .then((response) => {
                 const resp = response.data
                 const newData = resp.filter(item => legislative.every(x => x.commune_code !== item.commune_code));
@@ -36,5 +36,5 @@ import {
     );
   };
   
-  export const useDrink = () => useContext(LegislativeContext);
+  export const useLegislative = () => useContext(LegislativeContext);
   

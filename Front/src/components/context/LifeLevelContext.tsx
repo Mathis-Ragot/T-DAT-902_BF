@@ -15,8 +15,9 @@ import {
     const [lifeLevel, setLifeLevel] = useState([]);
 
     const getDataLifeLevel = useCallback(async (departmental_code: String) => {
-        await axios.get(env.LIFE_LEVEL_URL, { params: { departmental_code: departmental_code}})
+        await axios.get('http://localhost:8080/read-life-level', { params: { departmental_code: departmental_code}})
             .then((response) => {
+                console.log({response});
                 const resp = response.data
                 const newData = resp.filter(item => lifeLevel.every(x => x.commune_code !== item.commune_code));
 
@@ -36,5 +37,5 @@ import {
     );
   };
   
-  export const useDrink = () => useContext(LifeLevelContext);
+  export const useLifeLevel = () => useContext(LifeLevelContext);
   
