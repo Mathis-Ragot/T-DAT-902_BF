@@ -13,7 +13,7 @@ import {
   
     const [propertyPrice, setpropertyPrice] = useState([]);
 
-    const getDataPropertyPrice = useCallback(async (departmental_code: String) => {
+    const getDataPropertyPrice = useCallback(async (departmental_code: String, property_type_code: String) => {
         await axios.get('', { params: { departmental_code: departmental_code}})
             .then((response) => {
                 const resp = response.data
