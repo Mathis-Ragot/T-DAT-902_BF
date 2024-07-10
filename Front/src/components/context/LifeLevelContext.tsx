@@ -6,6 +6,7 @@ import {
   } from "react";
 
   import axios from 'axios';
+  import env from "react-dotenv";
   
   const LifeLevelContext = createContext({});
   
@@ -14,7 +15,7 @@ import {
     const [lifeLevel, setLifeLevel] = useState([]);
 
     const getDataLifeLevel = useCallback(async (departmental_code: String) => {
-        await axios.get('', { params: { departmental_code: departmental_code}})
+        await axios.get(env.LIFE_LEVEL_URL, { params: { departmental_code: departmental_code}})
             .then((response) => {
                 const resp = response.data
                 const newData = resp.filter(item => lifeLevel.every(x => x.commune_code !== item.commune_code));

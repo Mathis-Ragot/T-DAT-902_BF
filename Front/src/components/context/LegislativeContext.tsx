@@ -6,6 +6,7 @@ import {
   } from "react";
 
   import axios from 'axios';
+  import env from "react-dotenv";
   
   const LegislativeContext = createContext({});
   
@@ -14,7 +15,7 @@ import {
     const [legislative, setlegislative] = useState([]);
 
     const getDataLegislative = useCallback(async (departmental_code: String) => {
-        await axios.get('', { params: { departmental_code: departmental_code}})
+        await axios.get(env.LEGISLATIVE_URL, { params: { departmental_code: departmental_code}})
             .then((response) => {
                 const resp = response.data
                 const newData = resp.filter(item => legislative.every(x => x.commune_code !== item.commune_code));
