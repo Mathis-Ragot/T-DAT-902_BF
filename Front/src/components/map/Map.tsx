@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useContext, useEffect, useRef } from "react";
 import L from "leaflet";
 import { css } from "glamor";
 import "leaflet/dist/leaflet.css";
@@ -6,6 +6,16 @@ import worldGeoJSON from "../../../utils/geoJSON/geoWorld.json"; // GeoJSON file
 import departmentGeoJSON from "../../../utils/geoJSON/geoFrenchDepartment.json";
 import citiesGeoJSON from "../../../utils/geoJSON/geoFrenchCities.json";
 import frenchCities from "../../../utils/geoJSON/frenchCities.json";
+import {
+  FILTERS,
+  getImmoColor,
+  getSalaryColor,
+  getPoliticalColor,
+} from "../../utils/constant.js";
+
+import { LifeLevelContext } from "../context/LifeLevelContext.tsx";
+import { LegislativeContext } from "../context/LegislativeContext.tsx";
+import { PropertyPriceContext } from "../context/PropertyPriceContext.tsx";
 
 //#region Styles
 const activeCountryStyle: L.PathOptions = {
@@ -47,9 +57,15 @@ const citiesLimitStyle: L.PathOptions = {
 };
 
 const citiesFillStyle: L.PathOptions = {
-  weight: 5,
+  weight: 2,
   color: "red",
-  fillOpacity: 0,
+  fillOpacity: 0.3,
+};
+
+const citiesFilterFillStyle: L.PathOptions = {
+  weight: 2,
+  fillOpacity: 0.5,
+  color: "#3388ff",
 };
 
 const containerStyle = css({
@@ -93,8 +109,18 @@ const filterCommunesByDepartment = (departmentId: any) => {
 };
 
 const Map = (props: any) => {
+  const { lifeLevel, getDataLifeLevel } = useContext(LifeLevelContext);
+  const { legislative, getDataLegislative } = useContext(LegislativeContext);
+  const { propertyPrice, getDataPropertyPrice } =
+    useContext(PropertyPriceContext);
+  let cityClicked: any = null;
+
   const mapRef = useRef<L.Map | null>(null);
-  const { handleSetDeptInfos, handleSetCityInfos } = props;
+  const {
+    handleSetDeptInfos,
+    handleSetCityInfos,
+    applyFilter = FILTERS.immo,
+  } = props;
   useEffect(() => {
     if (!mapRef.current) {
       mapRef.current = L.map("map", MAP_CONFIG);
@@ -118,6 +144,8 @@ const Map = (props: any) => {
     onMapEvent();
   }, []);
 
+  useEffect(() => {}, [applyFilter]);
+
   useEffect(() => {
     // Handle zoom based on searchLocation changes
     const { searchLocation } = props;
@@ -128,6 +156,58 @@ const Map = (props: any) => {
       mapRef.current.setView([lat, lng], 13); // Adjust zoom level as needed
     }
   }, [props.searchLocation]);
+
+  const handleDepartementClick = (departementId: string) => {
+    getDataLifeLevel(departementId);
+    getDataPropertyPrice(departementId);
+    getDataLegislative(departementId);
+  };
+  const getFilterStyle = (feature: any) => {
+    if (!lifeLevel || !legislative || !propertyPrice) return citiesFillStyle;
+
+    // #region Salary
+    const currentSalary = lifeLevel.find(
+      (item: any) => item.commune_code == feature.properties.code
+    );
+
+    // #endregion
+
+    // #region politic
+    const politic = legislative.find(
+      (item: any) => item.commune_code == feature.properties.code
+    );
+    const highestPoliticPercentage = politic?.candidatesResults.reduce(
+      (max, obj) =>
+        parseFloat(obj.percentage_expressed) >
+        parseFloat(max.percentage_expressed)
+          ? obj
+          : max
+    );
+
+    // #endregion
+
+    switch (applyFilter) {
+      case FILTERS.immo:
+        return {
+          ...citiesFilterFillStyle,
+          fillColor: getImmoColor(currentSalary?.medianMonthlyStdrLiving),
+        };
+      case FILTERS.salary:
+        return {
+          ...citiesFilterFillStyle,
+          fillColor: getSalaryColor(currentSalary?.medianMonthlyStdrLiving),
+        };
+      case FILTERS.political:
+        return {
+          ...citiesFilterFillStyle,
+          fillColor: getPoliticalColor(
+            highestPoliticPercentage?.political_parti_name
+          ),
+        };
+      default:
+        return citiesFillStyle;
+    }
+  };
 
   const geoWorldDef = () => {
     const geoWorld = L.geoJSON(
@@ -143,64 +223,6 @@ const Map = (props: any) => {
       }
     );
     geoWorld.addTo(mapRef.current);
-  };
-
-  let communesLayer: any;
-  let cityClicked = null;
-
-  const addCommunesToMap = (communesGeoJSON) => {
-    if (communesLayer) {
-      mapRef.current.removeLayer(communesLayer);
-    }
-
-    const resetCommunesLayer = () => {
-      communesLayer.eachLayer((layer) => {
-        communesLayer.resetStyle(layer);
-      });
-    };
-
-    communesLayer = L.geoJSON(communesGeoJSON, {
-      style: citiesLimitStyle,
-      onEachFeature: (feature, layer) => {
-        layer.on({
-          mouseover: (e) => {
-            const layer = e.target;
-            if (!cityClicked) {
-              layer.setStyle(citiesFillStyle);
-            }
-            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
-              layer.bringToFront();
-            }
-          },
-          mouseout: (e) => {
-            const layer = e.target;
-            if (!cityClicked) {
-              communesLayer.resetStyle(layer);
-            }
-          },
-          click: (e) => {
-            const layer = e.target;
-            if (!cityClicked) {
-              cityClicked = feature;
-              handleSetCityInfos(feature);
-            } else {
-              if (feature.properties.code != cityClicked?.properties.code) {
-                handleSetCityInfos(feature);
-                cityClicked = feature;
-                resetCommunesLayer();
-                layer.setStyle(citiesFillStyle);
-              } else {
-                cityClicked = null;
-                handleSetCityInfos(null);
-                resetCommunesLayer();
-              }
-            }
-          },
-        });
-      },
-    });
-
-    communesLayer.addTo(mapRef.current);
   };
 
   const geoDepartmentDef = () => {
@@ -230,12 +252,13 @@ const Map = (props: any) => {
           click: (e) => {
             const layer = e.target;
             const departementId = feature.properties.code;
+
+            handleDepartementClick(departementId);
             handleSetDeptInfos(feature);
             handleSetCityInfos(null);
             cityClicked = null;
-
             const communesGeoJSON = filterCommunesByDepartment(departementId);
-            addCommunesToMap(communesGeoJSON);
+            geoCommunesDef(communesGeoJSON);
 
             if (mapRef.current?.getZoom() < 10)
               mapRef.current.fitBounds(layer.getBounds());
@@ -246,17 +269,75 @@ const Map = (props: any) => {
     geoDepartment.addTo(mapRef.current);
   };
 
+  let communesLayer: any;
+  const geoCommunesDef = (communesGeoJSON) => {
+    if (communesLayer) {
+      mapRef.current.removeLayer(communesLayer);
+    }
+
+    const resetCommunesLayer = () => {
+      communesLayer.eachLayer((layer) => {
+        communesLayer.resetStyle(layer);
+      });
+    };
+
+    communesLayer = L.geoJSON(communesGeoJSON, {
+      style: (feature) => {
+        return getFilterStyle(feature);
+      },
+      onEachFeature: (feature, layer) => {
+        layer.on({
+          mouseover: (e) => {
+            const layer = e.target;
+            if (!cityClicked) {
+              layer.setStyle(citiesFillStyle);
+            }
+            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+              layer.bringToFront();
+            }
+          },
+          mouseout: (e) => {
+            const layer = e.target;
+            if (!cityClicked) {
+              communesLayer.resetStyle(layer);
+            }
+          },
+          click: (e) => {
+            const layer = e.target;
+            getFilterStyle(feature);
+            if (!cityClicked) {
+              cityClicked = feature;
+              handleSetCityInfos(feature);
+            } else {
+              if (feature.properties.code != cityClicked?.properties.code) {
+                handleSetCityInfos(feature);
+                cityClicked = feature;
+                resetCommunesLayer();
+                layer.setStyle(citiesFillStyle);
+              } else {
+                cityClicked = null;
+                handleSetCityInfos(null);
+                resetCommunesLayer();
+              }
+            }
+          },
+        });
+      },
+    });
+
+    communesLayer.addTo(mapRef.current);
+  };
+
   const onMapEvent = () => {
     if (!mapRef.current) {
       return;
     }
     // Event listeners
-    mapRef.current.on("zoomend", () => {
-      console.log("Zoom level: " + mapRef.current?.getZoom());
-    });
+    mapRef.current.on("zoomend", () => {});
 
     mapRef.current.on("mousemove", (e: L.LeafletEvent) => {});
   };
+
   return (
     <div>
       <div {...containerStyle} id="map"></div>
