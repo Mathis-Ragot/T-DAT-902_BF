@@ -10,6 +10,12 @@ const COLORS = {
   green: "#3DE523",
 };
 
+const PROPERTY_TYPES_CODES = {
+  1: "MAISON",
+  2: "APPARTEMENT",
+  3: "TERRAIN",
+};
+
 const getPoliticalColor = (political) => {
   if (political === "RN") {
     return "#0D378A";
@@ -46,4 +52,10 @@ const getSalaryColor = (salary) => {
   }
 };
 
-export { FILTERS, getImmoColor, getSalaryColor, getPoliticalColor };
+export {
+  FILTERS,
+  PROPERTY_TYPES_CODES,
+  getImmoColor,
+  getSalaryColor,
+  getPoliticalColor,
+};

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { styled, useTheme } from "@mui/material/styles";
 import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
@@ -22,17 +22,11 @@ import { css } from "glamor";
 import SearchIcon from "@mui/icons-material/Search";
 import { Typography, Paper, List, ListItem, ListItemText } from "@mui/material";
 
-import {
-  generateImmoData,
-  generateSalaryData,
-  generatePoliticData,
-} from "../../utils/data_generator.js";
+import { LifeLevelContext } from "../context/LifeLevelContext.tsx";
+import { LegislativeContext } from "../context/LegislativeContext.tsx";
+import { PropertyPriceContext } from "../context/PropertyPriceContext.tsx";
 
 import { FILTERS } from "../../utils/constant.js";
-
-const immoData = generateImmoData();
-const salaryData = generateSalaryData();
-const politicData = generatePoliticData();
 
 const drawerWidth = 500;
 // #region styles
@@ -94,6 +88,7 @@ const styles = {
     padding: "0 10px",
   }),
   input: css({
+    backgroundColor: "transparent",
     width: "300px",
     padding: "10px 15px",
     border: "none",
@@ -150,18 +145,22 @@ interface AppBarProps extends MuiAppBarProps {
 }
 
 const NavScreen = () => {
+  const { legislative } = useContext(LegislativeContext);
+  const { lifeLevel } = useContext(LifeLevelContext);
+  const { propertyPrice } = useContext(PropertyPriceContext);
+
   // #region state
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const [searchLocation, setSearchLocation] = useState<any>(null);
-  const [applyFilter, setApplyFilter] = useState<any>(FILTERS.salary);
+  const [applyFilter, setApplyFilter] = useState<any>(FILTERS.immo);
   const [deptInfos, setDeptInfos] = useState<any>(null);
-  const [cityInfos, setCityInfos] = useState<any>(null);
+  const [cityInfos, setCityInfos] = useState<any>({});
+  const [city, setCity] = useState<any>(null);
   // #endregion
 
   // #region handle
   const handleApplyFilter = (event: any) => {
-    console.log("applyFilter", event.target.value);
     setApplyFilter(event.target.value);
   };
 
@@ -176,6 +175,12 @@ const NavScreen = () => {
   const handleSearch = (query: string) => {
     if (query) setSearchLocation(query);
   };
+
+  useEffect(() => {
+    console.log("legislative", legislative);
+    console.log("propertyPrice", propertyPrice);
+    console.log("lifeLevel", lifeLevel);
+  }, [legislative, propertyPrice, lifeLevel]);
 
   const handleSetDeptInfos = (infos: any) => {
     if (!infos) {
@@ -197,7 +202,7 @@ const NavScreen = () => {
 
   const handleSetCityInfos = (infos: any) => {
     if (!infos) {
-      setCityInfos(null);
+      // setCityInfos(null);
       return;
     }
 
@@ -205,35 +210,35 @@ const NavScreen = () => {
       (city: any) => city.insee_code === infos.properties.code
     );
 
-    console.log("politicData", politicData);
-    console.log("immoData", immoData);
-    console.log("salaryData", salaryData);
-
     if (city[0]) {
-      const politicResult = politicData.find(
-        (item) => item.commune_code === city[0].insee_code
-      );
-      const immoResult = immoData.filter(
-        (item) => item.commune_code === city[0].insee_code
-      );
-      const salaryResult = salaryData.find(
-        (item) => item.commune_code === city[0].insee_code
-      );
-
-      console.log("politicResult", politicResult);
-      console.log("immoResult", immoResult);
-      console.log("salaryResult", salaryResult);
-
-      const data = {
-        city: city[0],
-        politicData: politicResult,
-        immoResult: immoResult,
-        salaryResult: salaryResult,
-      };
-
-      console.log(data);
-      setCityInfos(data);
+      setCity(city[0]);
+      handleSearchFromCityFound(city[0]);
     }
+  };
+
+  const handleSearchFromCityFound = (city: any) => {
+    if (!city) {
+      return;
+    }
+
+    const politicResult = legislative.find(
+      (item: any) => item.communeCode === city.insee_code
+    );
+    const immoResult = propertyPrice.filter(
+      (item: any) => item.communeCode === city.insee_code
+    );
+    const salaryResult = lifeLevel.find(
+      (item: any) => item.communeCode === city.insee_code
+    );
+
+    const data = {
+      city: city,
+      politicData: politicResult,
+      immoResult: immoResult,
+      salaryResult: salaryResult,
+    };
+
+    setCityInfos(data);
   };
   // #endregion
 
@@ -304,7 +309,6 @@ const NavScreen = () => {
   };
 
   const renderCity = () => {
-    const { city } = cityInfos || {};
     const { zip_code, label, region_name } = city || {};
 
     return (
@@ -317,11 +321,11 @@ const NavScreen = () => {
           Informations de la ville
         </Typography>
 
-        {cityInfos ? (
+        {city ? (
           <>
             <Typography>
               <strong>Ville :</strong>{" "}
-              {label.charAt(0).toUpperCase() + label.slice(1)}
+              {label && label.charAt(0).toUpperCase() + label.slice(1)}
             </Typography>
             <Typography>
               <strong>Code postal :</strong> {zip_code}
@@ -341,6 +345,7 @@ const NavScreen = () => {
 
   const renderCityInformations = () => {
     const { politicData, immoResult, salaryResult } = cityInfos || {};
+
     return (
       <Box sx={{ marginTop: 3, marginRight: 2 }}>
         <Typography variant="h6" gutterBottom>
@@ -352,8 +357,8 @@ const NavScreen = () => {
               immoResult.map((property, index) => (
                 <ListItem key={index}>
                   <ListItemText
-                    primary={`${property.property_type_code}`}
-                    secondary={`Prix m² : ${property.m2_price}€`}
+                    primary={`${property?.propertyTypeCode}`}
+                    secondary={`Prix m² : ${property?.price}€`}
                   />
                 </ListItem>
               ))}
@@ -367,7 +372,7 @@ const NavScreen = () => {
           <ListItem>
             <ListItemText
               primary="Niveau de vie mensuel moyen"
-              secondary={`Salaire moyen : ${salaryResult.median_monthly_stdr_living}€`}
+              secondary={`Salaire moyen : ${salaryResult?.medianMonthlyStdrLiving}€`}
             />
           </ListItem>
         </Paper>
@@ -378,14 +383,22 @@ const NavScreen = () => {
         <Paper elevation={3} style={{ padding: "16px", marginBottom: "16px" }}>
           <List>
             {politicData &&
-              politicData.candidate_results.map((result, index) => (
-                <ListItem key={index}>
-                  <ListItemText
-                    primary={`${result.candidate_firstname} ${result.candidate_lastname} (${result.political_parti_name})`}
-                    secondary={`Pourcentage : ${result.percentage_expressed}%`}
-                  />
-                </ListItem>
-              ))}
+              politicData.candidatesResults.map((result) => {
+                if (
+                  !!result.candidate_firstname &&
+                  !!result.candidate_lastname &&
+                  !!result.political_parti_name &&
+                  !!result.percentage_expressed
+                )
+                  return (
+                    <ListItem>
+                      <ListItemText
+                        primary={`${result?.candidate_firstname} ${result?.candidate_lastname} (${result?.political_parti_name})`}
+                        secondary={`Pourcentage : ${result?.percentage_expressed}%`}
+                      />
+                    </ListItem>
+                  );
+              })}
           </List>
         </Paper>
       </Box>
@@ -462,9 +475,6 @@ const NavScreen = () => {
             handleSetCityInfos={handleSetCityInfos}
             searchLocation={searchLocation}
             applyFilter={applyFilter}
-            immoData={immoData}
-            salaryData={salaryData}
-            politicData={politicData}
           />
         </div>
       </Main>

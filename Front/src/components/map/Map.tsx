@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useContext, useEffect, useRef } from "react";
 import L from "leaflet";
 import { css } from "glamor";
 import "leaflet/dist/leaflet.css";
@@ -13,7 +13,9 @@ import {
   getPoliticalColor,
 } from "../../utils/constant.js";
 
-import { useLifeLevel } from "../context/LifeLevelContext.tsx";
+import { LifeLevelContext } from "../context/LifeLevelContext.tsx";
+import { LegislativeContext } from "../context/LegislativeContext.tsx";
+import { PropertyPriceContext } from "../context/PropertyPriceContext.tsx";
 
 //#region Styles
 const activeCountryStyle: L.PathOptions = {
@@ -98,7 +100,6 @@ const filterCommunesByDepartment = (departmentId: any) => {
     .filter((city: any) => city.department_number === departmentId)
     .map((city: any) => city.insee_code);
 
-  console.log(zipCodes);
   return {
     type: "FeatureCollection",
     features: citiesGeoJSON.features.filter((feature: any) => {
@@ -108,7 +109,12 @@ const filterCommunesByDepartment = (departmentId: any) => {
 };
 
 const Map = (props: any) => {
-  const { lifeLevel, getDataLifeLevel } = useLifeLevel()
+  const { lifeLevel, getDataLifeLevel } = useContext(LifeLevelContext);
+  const { legislative, getDataLegislative } = useContext(LegislativeContext);
+  const { propertyPrice, getDataPropertyPrice } =
+    useContext(PropertyPriceContext);
+  let cityClicked: any = null;
+
   const mapRef = useRef<L.Map | null>(null);
   const {
     handleSetDeptInfos,
@@ -151,59 +157,51 @@ const Map = (props: any) => {
     }
   }, [props.searchLocation]);
 
+  const handleDepartementClick = (departementId: string) => {
+    getDataLifeLevel(departementId);
+    getDataPropertyPrice(departementId);
+    getDataLegislative(departementId);
+  };
   const getFilterStyle = (feature: any) => {
-    //console.log("feature", feature);
-
-    const { immoData, salaryData, politicData } = props;
-
-    if (!immoData || !salaryData || !politicData) return citiesFillStyle;
+    if (!lifeLevel || !legislative || !propertyPrice) return citiesFillStyle;
 
     // #region Salary
-    const currentSalary = salaryData.find(
+    const currentSalary = lifeLevel.find(
       (item: any) => item.commune_code == feature.properties.code
     );
-    // console.log(
-    //   "currentSalary",
-    //   currentSalary,
-    //   "getColor on ",
-    //   currentSalary.median_monthly_stdr_living
-    // );
+
     // #endregion
 
     // #region politic
-    const politic = politicData.find(
+    const politic = legislative.find(
       (item: any) => item.commune_code == feature.properties.code
     );
-    //console.log(politic);
-    const highestPoliticPercentage = politic.candidate_results.reduce(
+    const highestPoliticPercentage = politic?.candidatesResults.reduce(
       (max, obj) =>
         parseFloat(obj.percentage_expressed) >
         parseFloat(max.percentage_expressed)
           ? obj
           : max
     );
-    // console.log(
-    //   "highestPoliticPercentage",
-    //   highestPoliticPercentage,
-    //   "getDColor on",
-    //   highestPoliticPercentage.political_parti_name
-    //);
 
     // #endregion
 
     switch (applyFilter) {
       case FILTERS.immo:
-        return citiesFillStyle;
+        return {
+          ...citiesFilterFillStyle,
+          fillColor: getImmoColor(currentSalary?.medianMonthlyStdrLiving),
+        };
       case FILTERS.salary:
         return {
           ...citiesFilterFillStyle,
-          fillColor: getSalaryColor(currentSalary.median_monthly_stdr_living),
+          fillColor: getSalaryColor(currentSalary?.medianMonthlyStdrLiving),
         };
       case FILTERS.political:
         return {
           ...citiesFilterFillStyle,
           fillColor: getPoliticalColor(
-            highestPoliticPercentage.political_parti_name
+            highestPoliticPercentage?.political_parti_name
           ),
         };
       default:
@@ -254,11 +252,11 @@ const Map = (props: any) => {
           click: (e) => {
             const layer = e.target;
             const departementId = feature.properties.code;
+
+            handleDepartementClick(departementId);
             handleSetDeptInfos(feature);
             handleSetCityInfos(null);
             cityClicked = null;
-            getDataLifeLevel(departementId);
-
             const communesGeoJSON = filterCommunesByDepartment(departementId);
             geoCommunesDef(communesGeoJSON);
 
@@ -272,7 +270,6 @@ const Map = (props: any) => {
   };
 
   let communesLayer: any;
-  let cityClicked: any = null;
   const geoCommunesDef = (communesGeoJSON) => {
     if (communesLayer) {
       mapRef.current.removeLayer(communesLayer);
@@ -336,9 +333,7 @@ const Map = (props: any) => {
       return;
     }
     // Event listeners
-    mapRef.current.on("zoomend", () => {
-      //console.log("Zoom level: " + mapRef.current?.getZoom());
-    });
+    mapRef.current.on("zoomend", () => {});
 
     mapRef.current.on("mousemove", (e: L.LeafletEvent) => {});
   };

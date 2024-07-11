@@ -1,41 +1,37 @@
-import {
-    createContext,
-    useContext,
-    useCallback,
-    useState,
-  } from "react";
+import { createContext, useCallback, useState } from "react";
+import { SERVER_URL, LIFE_LVL_URL } from "../../constants/routes";
 
-  import axios from 'axios';
-  import env from "react-dotenv";
-  
-  const LifeLevelContext = createContext({});
-  
-  export const LifeLevelProvider = ({ children }) => {
-  
-    const [lifeLevel, setLifeLevel] = useState([]);
+import axios from "axios";
 
-    const getDataLifeLevel = useCallback(async (departmental_code: String) => {
-        await axios.get('http://localhost:8080/read-life-level', { params: { departmental_code: departmental_code}})
-            .then((response) => {
-                console.log({response});
-                const resp = response.data
-                const newData = resp.filter(item => lifeLevel.every(x => x.commune_code !== item.commune_code));
+export const LifeLevelContext = createContext({});
+const axiosInstance = axios.create({
+  baseURL: SERVER_URL,
+  headers: {
+    "Content-Type": "application/json",
+    // "ngrok-skip-browser-warning": "true",
+  },
+});
 
-                setLifeLevel(prevData => [...prevData, ...newData]);
-            })
-            .catch((e) => {
-                console.log('Error fetching data: ', e)
-            })
-    }, [lifeLevel]);
-  
-    return (
-      <LifeLevelContext.Provider
-        value={{ lifeLevel, getDataLifeLevel }}
-      >
-        {children}
-      </LifeLevelContext.Provider>
-    );
-  };
-  
-  export const useLifeLevel = () => useContext(LifeLevelContext);
-  
+export const LifeLevelProvider = ({ children }) => {
+  const [lifeLevel, setLifeLevel] = useState([]);
+
+  const getDataLifeLevel = useCallback(async (departmental_code: string) => {
+    try {
+      const response = await axiosInstance.get(LIFE_LVL_URL, {
+        params: { departmental_code },
+      });
+      if (response?.data) {
+        // setLifeLevel((prevData) => [...prevData, ...response?.data]);
+        setLifeLevel(response.data);
+      }
+    } catch (e) {
+      console.log("Error fetching data: ", e);
+    }
+  }, []);
+
+  return (
+    <LifeLevelContext.Provider value={{ lifeLevel, getDataLifeLevel }}>
+      {children}
+    </LifeLevelContext.Provider>
+  );
+};
